@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: ar.com.ayi.ejercicio2final.ExamenfinalApplicationTests
+-------------------------------------------------------------------------------
+Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 8.198 s - in ar.com.ayi.ejercicio2final.ExamenfinalApplicationTests
