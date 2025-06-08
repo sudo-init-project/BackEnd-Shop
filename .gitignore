@@ -1,0 +1,41 @@
+#Clases de archivos compilados 
+*.class
+#Archivos de paquetes
+*.jar
+*.war
+*.ear
+
+#Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+
+#Intellij IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+#Eclipse
+.settings/
+.project
+.classpath
+
+#VsCode
+.vscode/
+
+#Mac
+.DS_Store
+
+#Logs
+
+logs/
+*.log
+
+#Variables de ambiente 
+.env
+.env.local
+
