@@ -1,14 +1,15 @@
-# DockerFile produccion
+# Dockerfile produccion
 
-# Stage de build
 FROM maven:3.8-openjdk-17 AS builder
 WORKDIR /app
-COPY pom.xml .
-RUN mvn dependency:go-offline
-COPY src ./src
+
+# Copiar todo el proyecto
+COPY . .
+
+#(sin dependency:go-offline que está causando problemas la poronga esta)
 RUN mvn clean package -DskipTests
 
-# RunTime stage
+# Runtime stage
 FROM openjdk:17-jdk-slim
 WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
