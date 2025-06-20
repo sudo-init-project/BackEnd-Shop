@@ -64,6 +64,8 @@ jobs:
           ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.short_sha }}
           
     - name: Update infrastructure repository
+      env:
+        GITHUB_TOKEN: ${{ secrets.INFRA_TOKEN }}
       run: |
         git config --global user.name "CI Bot"
         git config --global user.email "ci-bot@github.com"
@@ -79,8 +81,8 @@ jobs:
         
         echo "🎯 Actualizando ambiente: $ENV"
         
-        # Clone infra repo
-        git clone https://${{ secrets.INFRA_TOKEN }}@github.com/${{ env.INFRA_REPO }}.git infra
+        # Clone infra repo con token correcto
+        git clone https://x-access-token:${{ secrets.INFRA_TOKEN }}@github.com/${{ env.INFRA_REPO }}.git infra
         cd infra
         
         # Update specific environment
