@@ -64,11 +64,11 @@ jobs:
           ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.short_sha }}
           
     - name: Update infrastructure repository
-      env:
-        GITHUB_TOKEN: ${{ secrets.INFRA_TOKEN }}
       run: |
+        # Configurar Git con token
         git config --global user.name "CI Bot"
         git config --global user.email "ci-bot@github.com"
+        git config --global url."https://x-access-token:${{ secrets.INFRA_TOKEN }}@github.com/".insteadOf "https://github.com/"
         
         # Determinar ambiente basado en branch/tag
         if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
@@ -81,21 +81,53 @@ jobs:
         
         echo "🎯 Actualizando ambiente: $ENV"
         
-        # Clone infra repo con token correcto
-        git clone https://x-access-token:${{ secrets.INFRA_TOKEN }}@github.com/${{ env.INFRA_REPO }}.git infra
+        # Clone infra repo
+        git clone https://github.com/${{ env.INFRA_REPO }}.git infra
         cd infra
         
-        # Update specific environment
+        # Verificar si hay cambios necesarios
+        CURRENT_TAG=$(grep -o 'newTag:.*' tags/backend-tag.yaml | cut -d' ' -f2 || echo "none")
+        NEW_TAG="${{ steps.meta.outputs.version }}"
+        
+        echo "🔍 Current tag: $CURRENT_TAG"
+        echo "🔍 New tag: $NEW_TAG"
+        
+        if [ "$CURRENT_TAG" == "$NEW_TAG" ]; then
+          echo "🟢 No changes needed, tag is already up to date"
+          exit 0
+        fi
+        
+        # Update specific environment in overlays
         if [ -f "overlays/$ENV/kustomization.yaml" ]; then
-          sed -i "s|${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:.*|${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}|g" overlays/$ENV/kustomization.yaml
+          echo "📝 Updating overlays/$ENV/kustomization.yaml"
+          sed -i "s|${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:.*|${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:$NEW_TAG|g" overlays/$ENV/kustomization.yaml
         fi
         
         # Update tags file
         if [ -f "tags/backend-tag.yaml" ]; then
-          sed -i "s|newTag:.*|newTag: ${{ steps.meta.outputs.version }}|g" tags/backend-tag.yaml
+          echo "📝 Updating tags/backend-tag.yaml"
+          sed -i "s|newTag:.*|newTag: $NEW_TAG|g" tags/backend-tag.yaml
         fi
+        
+        # Update base kustomization if exists
+        if [ -f "base/kustomization.yaml" ]; then
+          echo "📝 Updating base/kustomization.yaml"
+          sed -i "s|${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:.*|${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:$NEW_TAG|g" base/kustomization.yaml
+        fi
+        
+        # Check if there are changes to commit
+        if git diff --quiet; then
+          echo "🟢 No changes to commit"
+          exit 0
+        fi
+        
+        # Show changes
+        echo "📋 Changes to be committed:"
+        git diff --name-only
         
         # Commit and push
         git add .
-        git commit -m "🚀 Update backend ($ENV) to ${{ steps.meta.outputs.version }}" || echo "No changes to commit"
-        git push
+        git commit -m "🚀 Update backend ($ENV) to $NEW_TAG"
+        git push origin master
+        
+        echo "✅ Successfully updated infrastructure repository"
