@@ -62,40 +62,43 @@ jobs:
           ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
           ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
           ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.short_sha }}
-          
-    - name: Update infrastructure repository
+
+  update-infra:
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout infrastructure repository
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ env.INFRA_REPO }}
+        token: ${{ secrets.INFRA_TOKEN }}
+        path: infra
+        
+    - name: Set up variables
+      id: vars
       run: |
-        # Configurar Git con token
-        git config --global user.name "CI Bot"
-        git config --global user.email "ci-bot@github.com"
-        git config --global url."https://x-access-token:${{ secrets.INFRA_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        SHORT_SHA=${GITHUB_SHA::7}
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        echo "version=${TIMESTAMP}-${SHORT_SHA}" >> $GITHUB_OUTPUT
         
         # Determinar ambiente basado en branch/tag
         if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
-          ENV="staging"
+          echo "env=staging" >> $GITHUB_OUTPUT
         elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-          ENV="production"
+          echo "env=production" >> $GITHUB_OUTPUT
         else
-          ENV="dev"
+          echo "env=dev" >> $GITHUB_OUTPUT
         fi
+        
+    - name: Update infrastructure files
+      working-directory: infra
+      run: |
+        ENV="${{ steps.vars.outputs.env }}"
+        NEW_TAG="${{ steps.vars.outputs.version }}"
         
         echo "🎯 Actualizando ambiente: $ENV"
-        
-        # Clone infra repo
-        git clone https://github.com/${{ env.INFRA_REPO }}.git infra
-        cd infra
-        
-        # Verificar si hay cambios necesarios
-        CURRENT_TAG=$(grep -o 'newTag:.*' tags/backend-tag.yaml | cut -d' ' -f2 || echo "none")
-        NEW_TAG="${{ steps.meta.outputs.version }}"
-        
-        echo "🔍 Current tag: $CURRENT_TAG"
         echo "🔍 New tag: $NEW_TAG"
-        
-        if [ "$CURRENT_TAG" == "$NEW_TAG" ]; then
-          echo "🟢 No changes needed, tag is already up to date"
-          exit 0
-        fi
         
         # Update specific environment in overlays
         if [ -f "overlays/$ENV/kustomization.yaml" ]; then
@@ -115,6 +118,12 @@ jobs:
           sed -i "s|${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:.*|${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:$NEW_TAG|g" base/kustomization.yaml
         fi
         
+    - name: Commit and push changes
+      working-directory: infra
+      run: |
+        git config --local user.email "ci-bot@github.com"
+        git config --local user.name "CI Bot"
+        
         # Check if there are changes to commit
         if git diff --quiet; then
           echo "🟢 No changes to commit"
@@ -124,10 +133,11 @@ jobs:
         # Show changes
         echo "📋 Changes to be committed:"
         git diff --name-only
+        git status
         
         # Commit and push
         git add .
-        git commit -m "🚀 Update backend ($ENV) to $NEW_TAG"
-        git push origin master
+        git commit -m "🚀 Update backend (${{ steps.vars.outputs.env }}) to ${{ steps.vars.outputs.version }}"
+        git push
         
         echo "✅ Successfully updated infrastructure repository"
