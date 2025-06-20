@@ -123,4 +123,3 @@ spring.datasource.password=password
 - [Infra-App-K8s](https://github.com/sudo-init-project/Infra-App-K8s) - Kubernetes
 
 
-ALGO
