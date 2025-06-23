@@ -39,6 +39,8 @@ public class WebSecurityConfig {
                 .authorizeHttpRequests(authRequest ->
                         authRequest
                                 .requestMatchers(HttpMethod.POST,"/auth/**").permitAll()
+                                .requestMatchers(HttpMethod.GET,"/productos/**").permitAll()  // AGREGADO
+                                .requestMatchers(HttpMethod.GET,"/clientes/**").permitAll()   // AGREGADO
                                 .anyRequest().authenticated()
                 );
         return http.build();
